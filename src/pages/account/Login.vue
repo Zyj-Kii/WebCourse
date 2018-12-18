@@ -1,10 +1,9 @@
 <template>
     <div>
-        <div class="header">五邑大学管理系统</div>
         <div class="box">
             <el-form label-position="right" label-width="80px">
-                <el-form-item label="账号">
-                    <el-input placeholder="输入账号" v-model="formData.account"></el-input>
+                <el-form-item label="用户名">
+                    <el-input placeholder="输入用户名" v-model="formData.account"></el-input>
                 </el-form-item>
                 <el-form-item label="密码">
                     <el-input
@@ -14,7 +13,6 @@
                 </el-form-item>
                 <el-form-item label="确认密码" v-if="isRegister()">
                     <el-input
-                        @change="checkPassword"
                         placeholder="确认密码"
                         type="password"
                         v-model="formData.confirmPassword">
@@ -28,14 +26,12 @@
 </template>
 
 <script>
-import axios from 'axios'
 export default {
   name: 'Login',
   data () {
     return {
-      type: '登陆',
-      toggle: '注册',
-      check: null,
+      type: '',
+      toggle: '',
       errorMsg: '',
       formData: {
         account: '',
@@ -58,9 +54,11 @@ export default {
     checkRegister () {
       const status = this.status
       const formData = this.formData
-      status.result = true
       this.checkLogin()
-      if (status.result && formData.password !== formData.confirmPassword) {
+      if (!status.result) {
+        return false
+      }
+      if (formData.password !== formData.confirmPassword) {
         status.result = false
         status.message = '密码不匹配，请再次确认'
       }
@@ -77,6 +75,9 @@ export default {
       } else if (formData.password === '') {
         status.result = false
         status.message = '密码不能为空'
+      } else if (formData.password.length < 6 || formData.password.length > 20) {
+        status.result = false
+        status.message = '密码长度需在6-20之间'
       }
       this.showError()
       return status.result
@@ -84,53 +85,72 @@ export default {
     showError () {
       const status = this.status
       if (!status.result) {
-        this.$message({
-          message: status.message,
-          type: 'error'
-        })
+        this.$errorToast(status.message)
       }
     },
     submit () {
       const formData = this.formData
-      if (this.type === '登陆' && this.checkLogin()) {
-        axios.post('/api/admin/adminLogin',
-          `adminName=${formData.account}&adminPassword=${formData.password}`
-        )
-          .then(res => {
-            if (res.code === 4000) {
-              this.$route.push({path: '/'})
+      if (this.type === '登录' && this.checkLogin()) {
+        this.$post('/admin/adminLogin', {
+          adminName: formData.account,
+          adminPassword: formData.password
+        })
+          .then(
+            res => {
+              console.table(res)
+              if (res.code === 2000) {
+                this.goToHome('登陆成功')
+                sessionStorage.admin = this.formData.account
+              } else {
+                this.$errorNotify(res.message)
+              }
             }
-          })
+          )
           .catch(error => {
             console.log(error)
           })
       } else if (this.checkRegister()) {
-        axios.post('/api/admin/registerAdmin', {
-          adminName: formData.account,
-          adminPassword: formData.password
-        })
-          .then(res => {
-            console.log(res)
-          })
+        this.$post(
+          '/admin/registerAdmin',
+          {
+            adminName: formData.account,
+            adminPassword: formData.password
+          }
+        )
+          .then(
+            res => {
+              if (res.code === 2000) {
+                this.goToHome('注册成功')
+              } else {
+                this.$errorNotify(res.message)
+              }
+            }
+          )
           .catch(error => {
-            console.log(error)
+            this.$errorNotify(error)
           })
       }
+    },
+    goToHome (message) {
+      this.$successToast(message, 1500)
+      setTimeout(() => {
+        this.$router.push({path: '/'})
+      }, 1500)
+    }
+  },
+  activated () {
+    if (this.$route.path.split('/')[1] === 'signup') {
+      this.type = '注册'
+      this.toggle = '登录'
+    } else {
+      this.type = '登录'
+      this.toggle = '注册'
     }
   }
 }
 </script>
 
 <style lang="stylus" scoped>
-    @import "~styles/variables.styl"
-    .header
-        position fixed
-        top 0
-        left 0
-        right 0
-        line-height 60px
-        background $bgColor
-        color: #fff
     .box
         position fixed
         top 50%
